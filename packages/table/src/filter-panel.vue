@@ -1,78 +1,76 @@
 <template>
   <el-popper
     ref="tooltip"
+    v-model:visible="tooltipVisible"
     :offset="0"
     :placement="placement"
     :show-arrow="false"
-    :trigger="['click']"
-    :visible="tooltipVisible"
+    :stop-popper-mouse-event="false"
     effect="light"
-    popper-class="el-table-filter el-table-filter-padding"
+    pure
+    manual-mode
+    popper-class="el-table-filter"
+    append-to-body
   >
     <template #default>
-      <div v-click-outside="handleOutsideClick">
-        <div v-if="multiple">
-          <div class="el-table-filter__content">
-            <el-scrollbar
-              :native="false"
-              :noresize="true"
-              wrap-class="el-table-filter__wrap"
+      <div v-if="multiple">
+        <div class="el-table-filter__content">
+          <el-scrollbar wrap-class="el-table-filter__wrap">
+            <el-checkbox-group
+              v-model="filteredValue"
+              class="el-table-filter__checkbox-group"
             >
-              <el-checkbox-group
-                v-model="filteredValue"
-                class="el-table-filter__checkbox-group"
+              <el-checkbox
+                v-for="filter in filters"
+                :key="filter.value"
+                :label="filter.value"
               >
-                <el-checkbox
-                  v-for="filter in filters"
-                  :key="filter.value"
-                  :label="filter.value"
-                >
-                  {{ filter.text }}
-                </el-checkbox>
-              </el-checkbox-group>
-            </el-scrollbar>
-          </div>
-          <div class="el-table-filter__bottom">
-            <button
-              :class="{ 'is-disabled': filteredValue.length === 0 }"
-              :disabled="filteredValue.length === 0"
-              type
-              @click="handleConfirm"
-            >
-              {{ t('el.table.confirmFilter') }}
-            </button>
-            <button type @click="handleReset">
-              {{ t('el.table.resetFilter') }}
-            </button>
-          </div>
+                {{ filter.text }}
+              </el-checkbox>
+            </el-checkbox-group>
+          </el-scrollbar>
         </div>
-        <ul v-else class="el-table-filter__list">
-          <li
-            :class="{
-              'is-active': filterValue === undefined || filterValue === null,
-            }"
-            class="el-table-filter__list-item"
-            @click="handleSelect(null)"
+        <div class="el-table-filter__bottom">
+          <button
+            :class="{ 'is-disabled': filteredValue.length === 0 }"
+            :disabled="filteredValue.length === 0"
+            type
+            @click="handleConfirm"
           >
-            {{ t('el.table.clearFilter') }}
-          </li>
-          <li
-            v-for="filter in filters"
-            :key="filter.value"
-            :class="{ 'is-active': isActive(filter) }"
-            :label="filter.value"
-            class="el-table-filter__list-item"
-            @click="handleSelect(filter.value)"
-          >
-            {{ filter.text }}
-          </li>
-        </ul>
+            {{ t('el.table.confirmFilter') }}
+          </button>
+          <button type @click="handleReset">
+            {{ t('el.table.resetFilter') }}
+          </button>
+        </div>
       </div>
+      <ul v-else class="el-table-filter__list">
+        <li
+          :class="{
+            'is-active': filterValue === undefined || filterValue === null,
+          }"
+          class="el-table-filter__list-item"
+          @click="handleSelect(null)"
+        >
+          {{ t('el.table.clearFilter') }}
+        </li>
+        <li
+          v-for="filter in filters"
+          :key="filter.value"
+          :class="{ 'is-active': isActive(filter) }"
+          :label="filter.value"
+          class="el-table-filter__list-item"
+          @click="handleSelect(filter.value)"
+        >
+          {{ filter.text }}
+        </li>
+      </ul>
     </template>
     <template #trigger>
       <span
+        v-click-outside:[popperPaneRef]="hideFilterPanel"
         class="el-table__column-filter-trigger el-none-outline"
-        @click="tooltipVisible = true"
+        @click="showFilterPanel"
       >
         <i
           :class="[
@@ -85,15 +83,9 @@
   </el-popper>
 </template>
 
-<script lang='ts'>
-import { Popper as ElPopper } from '@element-plus/popper'
-import { t } from '@element-plus/locale'
-import { ClickOutside } from '@element-plus/directives'
-import useDropdown from './dropdown'
-import ElCheckbox from '@element-plus/checkbox/src/checkbox.vue'
-import ElCheckboxGroup from '@element-plus/checkbox/src/checkbox-group.vue'
-import ElScrollbar from '@element-plus/scrollbar/src/index'
+<script lang="ts">
 import {
+  defineComponent,
   ref,
   computed,
   getCurrentInstance,
@@ -101,22 +93,24 @@ import {
   WritableComputedRef,
   PropType,
 } from 'vue'
-import { Store, TableColumnCtx, TableHeader } from './table'
+import ElPopper from '@element-plus/popper'
+import { t } from '@element-plus/locale'
+import ElCheckbox from '@element-plus/checkbox'
+import ElCheckboxGroup from '@element-plus/checkbox-group'
+import ElScrollbar from '@element-plus/scrollbar'
+import { ClickOutside } from '@element-plus/directives'
 
-export default {
+import { Store, TableColumnCtx, TableHeader } from './table.type'
+
+export default defineComponent({
   name: 'ElTableFilterPanel',
-
-  directives: {
-    ClickOutside,
-  },
-
   components: {
     ElCheckbox,
     ElCheckboxGroup,
     ElScrollbar,
     ElPopper,
   },
-
+  directives: { ClickOutside },
   props: {
     placement: {
       type: String,
@@ -139,8 +133,7 @@ export default {
       parent.filterPanels.value[props.column.id] = instance
     }
     const tooltipVisible = ref(false)
-    const { open, close } = useDropdown(instance)
-
+    const tooltip = ref(null)
     const filters = computed(() => {
       return props.column && props.column.filters
     })
@@ -175,28 +168,28 @@ export default {
       }
       return true
     })
-
     const isActive = filter => {
       return filter.value === filterValue.value
     }
-
-    const handleOutsideClick = () => {
-      setTimeout(() => {
-        tooltipVisible.value = false
-      }, 16)
+    const hidden = () => {
+      tooltipVisible.value = false
     }
-
+    const showFilterPanel = (e: MouseEvent) => {
+      e.stopPropagation()
+      tooltipVisible.value = !tooltipVisible.value
+    }
+    const hideFilterPanel = () => {
+      tooltipVisible.value = false
+    }
     const handleConfirm = () => {
       confirmFilter(filteredValue.value)
-      handleOutsideClick()
+      hidden()
     }
-
     const handleReset = () => {
       filteredValue.value = []
       confirmFilter(filteredValue.value)
-      handleOutsideClick()
+      hidden()
     }
-
     const handleSelect = (_filterValue?: string | string[]) => {
       filterValue.value = _filterValue
       if (typeof _filterValue !== 'undefined' && _filterValue !== null) {
@@ -204,9 +197,8 @@ export default {
       } else {
         confirmFilter([])
       }
-      handleOutsideClick()
+      hidden()
     }
-
     const confirmFilter = (filteredValue: unknown[]) => {
       props.store.commit('filterChange', {
         column: props.column,
@@ -221,19 +213,18 @@ export default {
         if (props.column) {
           props.upDataColumn('filterOpened', value)
         }
-        if (value) {
-          open()
-        } else {
-          close()
-        }
       },
       {
         immediate: true,
       },
     )
+
+    const popperPaneRef = computed(() => {
+      return tooltip.value?.popperRef
+    })
+
     return {
       tooltipVisible,
-      handleOutsideClick,
       multiple,
       filteredValue,
       filterValue,
@@ -243,17 +234,11 @@ export default {
       handleSelect,
       isActive,
       t,
+      showFilterPanel,
+      hideFilterPanel,
+      popperPaneRef,
+      tooltip,
     }
   },
-}
+})
 </script>
-
-<style>
-  .el-table-filter-padding {
-    padding: 0;
-    border: 1px solid #ebeef5 !important;
-  }
-  .el-none-outline {
-    outline: none;
-  }
-</style>

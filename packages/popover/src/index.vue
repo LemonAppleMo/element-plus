@@ -1,16 +1,15 @@
 <script lang="ts">
-import { defineComponent, Fragment, createTextVNode, renderSlot, toDisplayString, createCommentVNode } from 'vue'
-import { Popper as ElPopper } from '@element-plus/popper'
-import defaultProps, { Effect } from '@element-plus/popper/src/use-popper/defaults'
-import { renderPopper, renderTrigger, renderArrow } from '@element-plus/popper/src/renderers'
-
+import { defineComponent, Fragment, createTextVNode, renderSlot, toDisplayString, createCommentVNode, withDirectives, Teleport, createVNode } from 'vue'
+import ElPopper from '@element-plus/popper'
+import { defaultProps, Effect } from '@element-plus/popper'
+import { renderPopper, renderTrigger, renderArrow } from '@element-plus/popper'
+import { ClickOutside } from '@element-plus/directives'
 import { warn } from '@element-plus/utils/error'
 import { renderBlock, renderIf, PatchFlags } from '@element-plus/utils/vnode'
-import { stop } from '@element-plus/utils/dom'
 import usePopover, { SHOW_EVENT, HIDE_EVENT } from './usePopover'
 
 import type { PropType } from 'vue'
-import type { TriggerType } from '@element-plus/popper/src/use-popper/defaults'
+import type { TriggerType } from '@element-plus/popper'
 
 const emits = ['update:visible', 'after-enter', 'after-leave', SHOW_EVENT, HIDE_EVENT ]
 const NAME = 'ElPopover'
@@ -42,10 +41,15 @@ export default defineComponent({
       type: [String, Number],
       default: 150,
     },
+    appendToBody: {
+      type: Boolean,
+      default: true,
+    },
+    tabindex: Number,
   },
   emits,
   setup(props, ctx) {
-    if (process.env.NODE_EVN !== 'production' && props.visible && !ctx.slots.reference) {
+    if (process.env.NODE_ENV !== 'production' && props.visible && !ctx.slots.reference) {
       warn(NAME, `
         You cannot init popover without given reference
       `)
@@ -72,15 +76,14 @@ export default defineComponent({
       popperStyle,
       popperId,
       popperClass,
-      pure,
       showArrow,
-      tabIndex,
       transition,
       visibility,
+      tabindex,
     } = this
 
     const kls = [
-      this.content ? 'el-popover__plain' : '',
+      this.content ? 'el-popover--plain' : '',
       'el-popover',
       popperClass,
     ].join(' ')
@@ -91,12 +94,12 @@ export default defineComponent({
       popperClass: kls,
       popperStyle: popperStyle,
       popperId,
-      pure,
       visibility,
-      onMouseEnter: onPopperMouseEnter,
-      onMouseLeave: onPopperMouseLeave,
+      onMouseenter: onPopperMouseEnter,
+      onMouseleave: onPopperMouseLeave,
       onAfterEnter,
       onAfterLeave,
+      stopPopperMouseEvent: false,
     }, [
       title,
       content,
@@ -109,23 +112,19 @@ export default defineComponent({
     const _trigger = trigger ? renderTrigger(trigger, {
       ariaDescribedby: popperId,
       ref: 'triggerRef',
-      tabindex: tabIndex,
-      onMouseDown: stop,
-      onMouseUp: stop,
+      tabindex,
       ...events,
     }) : createCommentVNode('v-if', true)
 
-
     return renderBlock(Fragment, null, [
-      _trigger,
-      popover,
+      this.trigger === 'click'
+        ? withDirectives(_trigger, [[ClickOutside, this.hide]])
+        : _trigger,
+      createVNode(Teleport as any, {
+        disabled: !this.appendToBody,
+        to: 'body',
+      }, [popover], PatchFlags.PROPS, ['disabled']),
     ])
   },
 })
 </script>
-
-<style>
-.el-popover .el-popper__arrow::before {
-  border: 1px solid #ebeef5;
-}
-</style>

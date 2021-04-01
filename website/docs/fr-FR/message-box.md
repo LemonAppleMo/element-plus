@@ -125,10 +125,11 @@ Il est possible d'afficher du contenu un peu plus varié et personnalisé.
 </template>
 
 <script>
+  import { h } from 'vue';
+
   export default {
     methods: {
       open() {
-        const h = this.$createElement;
         this.$msgbox({
           title: 'Message',
           message: h('p', null, [
@@ -279,7 +280,7 @@ le contenu de MessageBox peut être centré.
 
 ### Méthode globale
 
-Si Element Plus est importé entièrement, il ajoutera les méthodes suivantes à Vue.prototype: `$msgbox`, `$alert`, `$confirm` et `$prompt`. Dans ce cas vous pouvez appeler `MessageBox` comme nous l'avons fait dans cette page. Les paramètres sont:
+Si Element Plus est importé entièrement, il ajoutera les méthodes suivantes à `app.config.globalProperties`: `$msgbox`, `$alert`, `$confirm` et `$prompt`. Dans ce cas vous pouvez appeler `MessageBox` comme nous l'avons fait dans cette page. Les paramètres sont:
 - `$msgbox(options)`
 - `$alert(message, title, options)` ou `$alert(message, options)`
 - `$confirm(message, title, options)` ou `$confirm(message, options)`
@@ -290,10 +291,10 @@ Si Element Plus est importé entièrement, il ajoutera les méthodes suivantes �
 Si vous préférer importer `MessageBox` à la demande:
 
 ```javascript
-import { MessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 ```
 
-Les méthodes correspondantes sont: `MessageBox`, `MessageBox.alert`, `MessageBox.confirm` et `MessageBox.prompt`. Les paramètres sont les mêmes que précédemment.
+Les méthodes correspondantes sont: `ElMessageBox`, `ElMessageBox.alert`, `ElMessageBox.confirm` et `ElMessageBox.prompt`. Les paramètres sont les mêmes que précédemment.
 
 ### Options
 
@@ -328,3 +329,4 @@ Les méthodes correspondantes sont: `MessageBox`, `MessageBox.alert`, `MessageBo
 | inputErrorMessage | Message d'erreur lorsque la validation échoue. | string | — | Illegal input |
 | center | Si le contenu doit être centré. | boolean | — | false |
 | roundButton | Si le bouton doit être rond. | boolean | — | false |
+| buttonSize | custom size of confirm and cancel buttons | string | mini / small / medium / large | small |

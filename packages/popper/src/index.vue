@@ -1,41 +1,34 @@
 <script lang="ts">
 import {
+  createVNode,
   defineComponent,
-  h,
   Fragment,
   Teleport,
-  onMounted,
   onBeforeUnmount,
   onDeactivated,
   onActivated,
+  onMounted,
+  renderSlot,
+  toDisplayString,
+  withDirectives,
 } from 'vue'
 
-import { ClickOutside } from '@element-plus/directives'
 import throwError from '@element-plus/utils/error'
-import { stop } from '@element-plus/utils/dom'
+import { PatchFlags, renderBlock } from '@element-plus/utils/vnode'
 
 import usePopper from './use-popper/index'
 import defaultProps from './use-popper/defaults'
 
-import {
-  renderMask,
-  renderPopper,
-  renderTrigger,
-  renderArrow,
-} from './renderers'
+import { renderPopper, renderTrigger, renderArrow } from './renderers'
+import { ClickOutside } from '@element-plus/directives'
 
 const compName = 'ElPopper'
 const UPDATE_VISIBLE_EVENT = 'update:visible'
 
-const emits = [UPDATE_VISIBLE_EVENT, 'after-enter', 'after-leave']
-
 export default defineComponent({
   name: compName,
-  directives: {
-    ClickOutside,
-  },
   props: defaultProps,
-  emits,
+  emits: [UPDATE_VISIBLE_EVENT, 'after-enter', 'after-leave', 'before-enter', 'before-leave'],
   setup(props, ctx) {
     if (!ctx.slots.trigger) {
       throwError(compName, 'Trigger must be provided')
@@ -60,21 +53,26 @@ export default defineComponent({
       $slots,
       appendToBody,
       class: kls,
+      style,
       effect,
       hide,
       onPopperMouseEnter,
       onPopperMouseLeave,
       onAfterEnter,
       onAfterLeave,
+      onBeforeEnter,
+      onBeforeLeave,
       popperClass,
       popperId,
+      popperStyle,
       pure,
       showArrow,
-      tabIndex,
       transition,
       visibility,
+      stopPopperMouseEvent,
     } = this
 
+    const isManual = this.isManualMode()
     const arrow = renderArrow(showArrow)
     const popper = renderPopper(
       {
@@ -82,146 +80,52 @@ export default defineComponent({
         name: transition,
         popperClass,
         popperId,
+        popperStyle,
         pure,
-        onMouseEnter: onPopperMouseEnter,
-        onMouseLeave: onPopperMouseLeave,
+        stopPopperMouseEvent,
+        onMouseenter: onPopperMouseEnter,
+        onMouseleave: onPopperMouseLeave,
         onAfterEnter,
         onAfterLeave,
+        onBeforeEnter,
+        onBeforeLeave,
         visibility,
       },
       [
-        $slots.default ? h(
-          Fragment,
-          null,
-          $slots.default(),
-        ) : this.content,
+        renderSlot($slots, 'default', {}, () => {
+          return [toDisplayString(this.content)]
+        }),
         arrow,
       ],
     )
 
-    const trigger = renderTrigger($slots.trigger?.(), {
+    const _t = $slots.trigger?.()
+
+    const triggerProps = {
       ariaDescribedby: popperId,
       class: kls,
+      style,
       ref: 'triggerRef',
-      tabindex: tabIndex,
-      onMouseDown: stop,
-      onMouseUp: stop,
       ...this.events,
-    })
+    }
 
-    return h(Fragment, null, [
+    const trigger = isManual
+      ? renderTrigger(_t, triggerProps)
+      : withDirectives(renderTrigger(_t, triggerProps), [[ClickOutside, hide]])
+
+    return renderBlock(Fragment, null, [
       trigger,
-      appendToBody
-        ? h(
-          Teleport,
-          {
-            to: 'body',
-          },
-          renderMask(popper, {
-            hide,
-          }),
-        )
-        : popper,
+      createVNode(
+        Teleport as any, // Vue did not support createVNode for Teleport
+        {
+          to: 'body',
+          disabled: !appendToBody,
+        },
+        [popper],
+        PatchFlags.PROPS,
+        ['disabled'],
+      ),
     ])
   },
 })
 </script>
-
-<style>
-.el-popper__mask {
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  width: 100%;
-}
-
-.el-popper {
-  position: absolute;
-  border-radius: 4px;
-  padding: 10px;
-  z-index: 2000;
-  font-size: 12px;
-  line-height: 1.2;
-  min-width: 10px;
-  word-wrap: break-word;
-  visibility: visible;
-}
-
-.el-popper__arrow,
-.el-popper__arrow::before {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  z-index: -1;
-}
-
-.el-popper__arrow::before {
-  content: ' ';
-  transform: rotate(45deg);
-  background: #303133;
-  box-sizing: border-box;
-}
-
-.el-popper[data-popper-placement^='top'] > .el-popper__arrow {
-  bottom: -5px;
-}
-
-.el-popper[data-popper-placement^='bottom'] > .el-popper__arrow {
-  top: -5px;
-}
-
-.el-popper[data-popper-placement^='left'] > .el-popper__arrow {
-  right: -5px;
-}
-
-.el-popper[data-popper-placement^='right'] > .el-popper__arrow {
-  left: -5px;
-}
-
-.is-dark {
-  background: #303133;
-  color: #fff;
-}
-.is-light {
-  background: #fff;
-  border: 1px solid #303133;
-}
-
-.is-dark .el-popper__arrow::before {
-  background: #303133;
-}
-
-.is-light .el-popper__arrow::before {
-  background: #fff;
-  border: 1px solid #303133;
-}
-
-.is-light[data-popper-placement^='top'] .el-popper__arrow::before {
-  border-top-color: transparent;
-  border-left-color: transparent;
-}
-
-.is-light[data-popper-placement^='bottom'] .el-popper__arrow::before {
-  border-bottom-color: transparent;
-  border-right-color: transparent;
-}
-
-.is-light[data-popper-placement^='left'] .el-popper__arrow::before {
-  border-left-color: transparent;
-  border-bottom-color: transparent;
-}
-
-.is-light[data-popper-placement^='right'] .el-popper__arrow::before {
-  border-top-color: transparent;
-  border-right-color: transparent;
-}
-
-.el-popper__pure {
-  padding: 0;
-  border: none;
-}
-
-.el-popper__pure .el-popper__arrow::before {
-  border: none;
-}
-</style>

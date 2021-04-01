@@ -1,9 +1,6 @@
 <template>
-  <transition name="el-zoom-in-top">
-    <div
-      v-if="visible"
-      class="el-time-panel"
-    >
+  <transition :name="transitionName">
+    <div v-if="actualVisible || visible" class="el-time-panel">
       <div class="el-time-panel__content" :class="{ 'has-seconds': showSeconds }">
         <time-spinner
           ref="spinner"
@@ -52,7 +49,7 @@ import { EVENT_CODE } from '@element-plus/utils/aria'
 import { t } from '@element-plus/locale'
 import TimeSpinner from './basic-time-spinner.vue'
 import dayjs, { Dayjs } from 'dayjs'
-import { getAvaliableArrs } from './useTimePicker'
+import { getAvaliableArrs, useOldValue } from './useTimePicker'
 
 export default defineComponent({
   components: {
@@ -60,19 +57,16 @@ export default defineComponent({
   },
 
   props: {
-    visible: {
+    visible: Boolean,
+    actualVisible: {
       type: Boolean,
-      default: false,
+      default: undefined,
     },
     datetimeRole: {
       type: String,
     },
     parsedValue: {
       type: [Object, String] as PropType<string | Dayjs>,
-    },
-    arrowControl: {
-      type: Boolean,
-      default: false,
     },
     format: {
       type: String,
@@ -85,8 +79,11 @@ export default defineComponent({
   setup(props, ctx) {
     // data
     const selectionRange = ref([0, 2])
-    const oldValue = ref(props.parsedValue)
+    const oldValue = useOldValue(props)
     // computed
+    const transitionName = computed(() => {
+      return props.actualVisible === undefined ? 'el-zoom-in-top' : ''
+    })
     const showSeconds = computed(() => {
       return props.format.includes('ss')
     })
@@ -140,7 +137,7 @@ export default defineComponent({
 
       if (code === EVENT_CODE.up || code === EVENT_CODE.down) {
         const step = (code === EVENT_CODE.up) ? -1 : 1
-        timePickeOptions['min_scrollDown'](step)
+        timePickeOptions['start_scrollDown'](step)
         event.preventDefault()
         return
       }
@@ -197,7 +194,7 @@ export default defineComponent({
       timePickeOptions[e[0]] = e[1]
     }
     const pickerBase = inject('EP_PICKER_BASE') as any
-    const { disabledHours, disabledMinutes, disabledSeconds, defaultValue } = pickerBase.props
+    const { arrowControl, disabledHours, disabledMinutes, disabledSeconds, defaultValue } = pickerBase.props
     const {
       getAvaliableHours,
       getAvaliableMinutes,
@@ -205,6 +202,8 @@ export default defineComponent({
     } = getAvaliableArrs(disabledHours, disabledMinutes, disabledSeconds)
 
     return {
+      transitionName,
+      arrowControl,
       onSetOption,
       t,
       handleConfirm,
@@ -220,8 +219,3 @@ export default defineComponent({
   },
 })
 </script>
-<style scoped>
-.el-time-panel {
-  position: relative;
-}
-</style>

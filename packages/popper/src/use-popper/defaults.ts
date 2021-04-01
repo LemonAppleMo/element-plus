@@ -17,9 +17,9 @@ export type Trigger = TriggerType | TriggerType[]
 
 export type IPopperOptions = {
   arrowOffset: number
+  autoClose: number
   boundariesPadding: number
   class: string
-  closeDelay: number
   cutoff: boolean
   disabled: boolean
   enterable: boolean
@@ -31,9 +31,10 @@ export type IPopperOptions = {
   showAfter: number
   showArrow: boolean
   strategy: PositioningStrategy
-  tabIndex: string
   trigger: Trigger
   visible: boolean
+  stopPopperMouseEvent: boolean
+  gpuAcceleration: boolean
 }
 
 export const DEFAULT_TRIGGER = 'hover'
@@ -49,6 +50,10 @@ export default {
     type: Boolean,
     default: true,
   },
+  autoClose: {
+    type: Number,
+    default: 0,
+  },
   boundariesPadding: {
     type: Number,
     default: 0,
@@ -61,7 +66,8 @@ export default {
     type: String,
     default: '',
   },
-  closeDelay: {
+  style: Object,
+  hideAfter: {
     type: Number,
     default: 200,
   },
@@ -80,10 +86,6 @@ export default {
   enterable: {
     type: Boolean,
     default: true,
-  },
-  hideAfter: {
-    type: Number,
-    default: 0,
   },
   manualMode: {
     type: Boolean,
@@ -130,12 +132,16 @@ export default {
     type: [String, Array] as PropType<Trigger>,
     default: DEFAULT_TRIGGER,
   },
-  tabIndex: {
-    type: String,
-    default: '0',
-  },
   visible: {
     type: Boolean,
     default: undefined,
+  },
+  stopPopperMouseEvent: {
+    type: Boolean,
+    default: true,
+  },
+  gpuAcceleration: {
+    type: Boolean,
+    default: true,
   },
 }

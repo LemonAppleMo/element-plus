@@ -7,14 +7,14 @@ import {
   ref,
   h,
 } from 'vue'
-import ElCheckbox from '@element-plus/checkbox/src/checkbox.vue'
+import ElCheckbox from '@element-plus/checkbox'
 import FilterPanel from '../filter-panel.vue'
 import useLayoutObserver from '../layout-observer'
 import useEvent from './event-helper'
 import useStyle from './style.helper'
 import useUtils from './utils-helper'
 import { hColgroup } from '../h-helper'
-import { Table, TableHeader } from '../table'
+import { Table, TableHeader } from '../table.type'
 import { TableHeaderProps } from './table-header'
 
 export default defineComponent({
@@ -79,7 +79,7 @@ export default defineComponent({
     } = useStyle(props)
     const { isGroup, toggleAllSelection, columnRows } = useUtils(props)
 
-    instance.vnode.state = {
+    instance.state = {
       onColumnsChange,
       onScrollableChange,
     }
@@ -154,10 +154,8 @@ export default defineComponent({
                     onClick: $event => this.handleHeaderClick($event, column),
                     onContextmenu: $event =>
                       this.handleHeaderContextMenu($event, column),
-                    onMousedown: $event =>
-                      this.handleMouseDown($event, column),
-                    onMouseMove: $event =>
-                      this.handleMouseMove($event, column),
+                    onMousedown: $event => this.handleMouseDown($event, column),
+                    onMousemove: $event => this.handleMouseMove($event, column),
                     onMouseout: this.handleMouseOut,
                   },
                   [
@@ -177,7 +175,7 @@ export default defineComponent({
                         column.renderHeader
                           ? column.renderHeader({
                             column,
-                            index_: cellIndex,
+                            $index: cellIndex,
                             store: this.store,
                             _self: this.$parent,
                           })

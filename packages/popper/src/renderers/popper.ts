@@ -1,4 +1,5 @@
 import { withDirectives, Transition, vShow, withCtx, createVNode } from 'vue'
+import { NOOP } from '@vue/shared'
 import { PatchFlags } from '@element-plus/utils/vnode'
 import { stop } from '@element-plus/utils/dom'
 
@@ -6,18 +7,21 @@ import type { VNode, Ref } from 'vue'
 import type { Effect } from '../use-popper/defaults'
 
 interface IRenderPopperProps {
-  name: string
   effect: Effect
+  name: string
+  stopPopperMouseEvent: boolean
   popperClass: string
   popperStyle?: Partial<CSSStyleDeclaration>
   popperId: string
   popperRef?: Ref<HTMLElement>
-  pure: boolean
+  pure?: boolean
   visibility: boolean
-  onMouseEnter: () => void
-  onMouseLeave: () => void
-  onAfterEnter: () => void
-  onAfterLeave: () => void
+  onMouseenter: () => void
+  onMouseleave: () => void
+  onAfterEnter?: () => void
+  onAfterLeave?: () => void
+  onBeforeEnter?: () => void
+  onBeforeLeave?: () => void
 }
 
 export default function renderPopper(
@@ -27,23 +31,26 @@ export default function renderPopper(
   const {
     effect,
     name,
+    stopPopperMouseEvent,
     popperClass,
     popperStyle,
     popperRef,
     pure,
     popperId,
     visibility,
-    onMouseEnter,
-    onMouseLeave,
+    onMouseenter,
+    onMouseleave,
     onAfterEnter,
     onAfterLeave,
+    onBeforeEnter,
+    onBeforeLeave,
   } = props
 
   const kls = [
+    popperClass,
     'el-popper',
     'is-' + effect,
-    popperClass,
-    pure ? 'el-popper__pure' : '',
+    pure ? 'is-pure' : '',
   ]
   /**
    * Equivalent to
@@ -53,12 +60,16 @@ export default function renderPopper(
    *  </div>
    * </transition>
    */
+
+  const mouseUpAndDown = stopPopperMouseEvent ? stop : NOOP
   return createVNode(
     Transition,
     {
       name,
-      onAfterEnter,
-      onAfterLeave,
+      'onAfterEnter': onAfterEnter,
+      'onAfterLeave': onAfterLeave,
+      'onBeforeEnter': onBeforeEnter,
+      'onBeforeLeave': onBeforeLeave,
     },
     {
       default: withCtx(() => [withDirectives(
@@ -71,9 +82,11 @@ export default function renderPopper(
             id: popperId,
             ref: popperRef ?? 'popperRef',
             role: 'tooltip',
-            onMouseEnter,
-            onMouseLeave,
+            onMouseenter,
+            onMouseleave,
             onClick: stop,
+            onMousedown: mouseUpAndDown,
+            onMouseup: mouseUpAndDown,
           },
           children,
           PatchFlags.CLASS | PatchFlags.STYLE | PatchFlags.PROPS | PatchFlags.HYDRATE_EVENTS,
@@ -81,6 +94,8 @@ export default function renderPopper(
             'aria-hidden',
             'onMouseenter',
             'onMouseleave',
+            'onMousedown',
+            'onMouseup',
             'onClick',
             'id',
           ],
@@ -88,6 +103,6 @@ export default function renderPopper(
         [[vShow, visibility]],
       )]),
     },
-    PatchFlags.PROPS, ['name', 'onAfter-enter', 'onAfter-leave'],
+    PatchFlags.PROPS, ['name', 'onAfterEnter', 'onAfterLeave', 'onBeforeEnter', 'onBeforeLeave'],
   )
 }

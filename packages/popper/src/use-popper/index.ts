@@ -1,9 +1,4 @@
-import {
-  computed,
-  ref,
-  reactive,
-  watch,
-} from 'vue'
+import { computed, ref, reactive, watch, CSSProperties } from 'vue'
 import { createPopper } from '@popperjs/core'
 
 import {
@@ -12,18 +7,39 @@ import {
   isHTMLElement,
   isArray,
   isString,
+  $,
 } from '@element-plus/utils/util'
+import PopupManager from '@element-plus/utils/popup-manager'
 
 import usePopperOptions from './popper-options'
 
-import type { ComponentPublicInstance, SetupContext } from 'vue'
-import type { IPopperOptions, TriggerType, PopperInstance, RefElement } from './defaults'
+import type { ComponentPublicInstance, SetupContext, Ref } from 'vue'
+import type {
+  IPopperOptions,
+  TriggerType,
+  PopperInstance,
+  RefElement,
+} from './defaults'
+
+export type ElementType = ComponentPublicInstance | HTMLElement
+export type EmitType = 'update:visible' | 'after-enter' | 'after-leave' | 'before-enter' | 'before-leave'
+
+export interface PopperEvents {
+  onClick?: (e: Event) => void
+  onMouseenter?: (e: Event) => void
+  onMouseleave?: (e: Event) => void
+  onFocus?: (e: Event) => void
+  onBlur?: (e: Event) => void
+}
 
 export const DEFAULT_TRIGGER = ['hover']
 export const UPDATE_VISIBLE_EVENT = 'update:visible'
-export default function (props: IPopperOptions, { emit }: SetupContext<string[]>) {
+export default function(
+  props: IPopperOptions,
+  { emit }: SetupContext<EmitType[]>,
+) {
   const arrowRef = ref<RefElement>(null)
-  const triggerRef = ref<ComponentPublicInstance | HTMLElement>(null)
+  const triggerRef = ref(null) as Ref<ElementType>
   const popperRef = ref<RefElement>(null)
 
   const popperId = `el-popper-${generateId()}`
@@ -33,6 +49,8 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
   let triggerFocused = false
 
   const isManualMode = () => props.manualMode || props.trigger === 'manual'
+
+  const popperStyle = ref<CSSProperties>({ zIndex: PopupManager.nextZIndex() })
 
   const popperOptions = usePopperOptions(props, {
     arrow: arrowRef,
@@ -53,18 +71,19 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
     },
     set(val) {
       if (isManualMode()) return
-      isBool(props.visible) ? emit(UPDATE_VISIBLE_EVENT, val) : state.visible = val
+      isBool(props.visible)
+        ? emit(UPDATE_VISIBLE_EVENT, val)
+        : (state.visible = val)
     },
   })
 
   function _show() {
-    if (props.hideAfter > 0) {
+    if (props.autoClose > 0) {
       hideTimer = window.setTimeout(() => {
         _hide()
-      }, props.hideAfter)
+      }, props.autoClose)
     }
     visibility.value = true
-    update()
   }
 
   function _hide() {
@@ -91,10 +110,10 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
   const hide = () => {
     if (isManualMode()) return
     clearTimers()
-    if (props.closeDelay > 0) {
+    if (props.hideAfter > 0) {
       hideTimer = window.setTimeout(() => {
         close()
-      }, props.closeDelay)
+      }, props.hideAfter)
     } else {
       close()
     }
@@ -131,22 +150,21 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
   }
 
   function initializePopper() {
-    const _trigger = isHTMLElement(triggerRef.value)
-      ? triggerRef.value
-      : (triggerRef.value as ComponentPublicInstance).$el
-    detachPopper()
-    popperInstance = createPopper(
-      _trigger,
-      popperRef.value,
-      popperOptions.value,
-    )
+    if (!$(visibility)) {
+      return
+    }
+    const unwrappedTrigger = $(triggerRef)
+    const _trigger = isHTMLElement(unwrappedTrigger)
+      ? unwrappedTrigger
+      : (unwrappedTrigger as ComponentPublicInstance).$el
+    popperInstance = createPopper(_trigger, $(popperRef), $(popperOptions))
 
     popperInstance.update()
   }
 
   function doDestroy(forceDestroy?: boolean) {
     /* istanbul ignore if */
-    if (!popperInstance || (visibility.value && !forceDestroy)) return
+    if (!popperInstance || ($(visibility) && !forceDestroy)) return
     detachPopper()
   }
 
@@ -155,15 +173,12 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
     popperInstance = null
   }
 
-  const events = {} as {
-    onClick?: (e: Event) => void
-    onMouseEnter?: (e: Event) => void
-    onMouseLeave?: (e: Event) => void
-    onFocus?: (e: Event) => void
-    onBlur?: (e: Event) => void
-  }
+  const events = {} as PopperEvents
 
   function update() {
+    if (!$(visibility)) {
+      return
+    }
     if (popperInstance) {
       popperInstance.update()
     } else {
@@ -171,9 +186,16 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
     }
   }
 
+  function onVisibilityChange(toState: boolean) {
+    if (toState) {
+      popperStyle.value.zIndex = PopupManager.nextZIndex()
+      initializePopper()
+    }
+  }
+
   if (!isManualMode()) {
     const toggleState = () => {
-      if (visibility.value) {
+      if ($(visibility)) {
         hide()
       } else {
         show()
@@ -213,31 +235,22 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
       }
     }
 
-    const mapEvents = (t: TriggerType) => {
-      switch (t) {
-        case 'click': {
-          events.onClick = popperEventsHandler
-          break
-        }
-        case 'hover': {
-          events.onMouseEnter = popperEventsHandler
-          events.onMouseLeave = popperEventsHandler
-          break
-        }
-        case 'focus': {
-          events.onFocus = popperEventsHandler
-          events.onBlur = popperEventsHandler
-          break
-        }
-        default: {
-          break
-        }
-      }
+    const triggerEventsMap: Partial<Record<TriggerType, (keyof PopperEvents)[]>> = {
+      click: ['onClick'],
+      hover: ['onMouseenter', 'onMouseleave'],
+      focus: ['onFocus', 'onBlur'],
     }
+
+    const mapEvents = (t: TriggerType) => {
+      triggerEventsMap[t].forEach(event => {
+        events[event] = popperEventsHandler
+      })
+    }
+
     if (isArray(props.trigger)) {
       Object.values(props.trigger).map(mapEvents)
     } else {
-      mapEvents(props.trigger)
+      mapEvents(props.trigger as TriggerType)
     }
   }
 
@@ -247,7 +260,7 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
     popperInstance.update()
   })
 
-  watch(visibility, update)
+  watch(visibility, onVisibilityChange)
 
   return {
     update,
@@ -260,14 +273,23 @@ export default function (props: IPopperOptions, { emit }: SetupContext<string[]>
       emit('after-enter')
     },
     onAfterLeave: () => {
+      detachPopper()
       emit('after-leave')
     },
+    onBeforeEnter: () => {
+      emit('before-enter')
+    },
+    onBeforeLeave: () => {
+      emit('before-leave')
+    },
     initializePopper,
+    isManualMode,
     arrowRef,
     events,
     popperId,
     popperInstance,
     popperRef,
+    popperStyle,
     triggerRef,
     visibility,
   }

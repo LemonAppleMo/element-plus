@@ -1,7 +1,7 @@
 import { getCurrentInstance, ref } from 'vue'
 import { hasClass, addClass, removeClass } from '@element-plus/utils/dom'
 import isServer from '@element-plus/utils/isServer'
-import { TableColumnCtx, Table } from '../table'
+import { TableColumnCtx, Table } from '../table.type'
 import { TableHeaderProps } from './table-header'
 
 function useEvent(props: TableHeaderProps, emit) {
@@ -18,7 +18,6 @@ function useEvent(props: TableHeaderProps, emit) {
     } else if (column.filterable && !column.sortable) {
       handleFilterClick(event)
     }
-
     parent.emit('header-click', column, event)
   }
 
